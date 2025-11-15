@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { SidebarNavigation } from "../components/sidebar-navigation"
 import { HomePage } from "./home-page"
 import { AdminHomePage } from "./admin-home-page"
@@ -35,6 +35,29 @@ export function Dashboard({ userRole, onLogout }: DashboardProps) {
     setCurrentPage(previousPage)
   }
 
+  const handleThemeToggle = () => {
+    const newTheme = !isDarkMode
+    setIsDarkMode(newTheme)
+    if (newTheme) {
+      document.documentElement.setAttribute("data-theme", "dark")
+      document.documentElement.classList.add("dark")
+    } else {
+      document.documentElement.setAttribute("data-theme", "light")
+      document.documentElement.classList.remove("dark")
+    }
+  }
+
+  // Apply theme on mount
+  useEffect(() => {
+    if (isDarkMode) {
+      document.documentElement.setAttribute("data-theme", "dark")
+      document.documentElement.classList.add("dark")
+    } else {
+      document.documentElement.setAttribute("data-theme", "light")
+      document.documentElement.classList.remove("dark")
+    }
+  }, [isDarkMode])
+
   const renderPage = () => {
     switch (currentPage) {
       case "home":
@@ -65,7 +88,7 @@ export function Dashboard({ userRole, onLogout }: DashboardProps) {
         onPageChange={handlePageChange}
         userRole={userRole}
         isDarkMode={isDarkMode}
-        onThemeToggle={() => setIsDarkMode(!isDarkMode)}
+        onThemeToggle={handleThemeToggle}
       />
       <main className="flex-1 md:ml-0">
         {currentPage === "containers" && (

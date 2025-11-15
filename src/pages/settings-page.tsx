@@ -48,7 +48,13 @@ export function SettingsPage({ onLogout }: SettingsPageProps) {
     if (success) {
       setSuccessMessage("Theme updated successfully")
       setTimeout(() => setSuccessMessage(""), 3000)
-      document.documentElement.classList.toggle("light", newTheme === "light")
+      if (newTheme === "dark") {
+        document.documentElement.setAttribute("data-theme", "dark")
+        document.documentElement.classList.add("dark")
+      } else {
+        document.documentElement.setAttribute("data-theme", "light")
+        document.documentElement.classList.remove("dark")
+      }
     }
   }
 
@@ -280,8 +286,8 @@ export function SettingsPage({ onLogout }: SettingsPageProps) {
               <button
                 onClick={() => handleNotificationToggle("emailAlerts")}
                 disabled={isLoading}
-                className={`relative inline-flex h-8 w-14 items-center rounded-full transition-all border-2 ${
-                  notifications.emailAlerts ? "bg-primary border-primary" : "bg-disabled-bg border-border"
+                className={`relative inline-flex h-8 w-14 items-center rounded-full transition-all border-2 hover:scale-105 ${
+                  notifications.emailAlerts ? "bg-primary border-primary shadow-md shadow-primary/30" : "bg-disabled-bg border-border hover:border-primary/50"
                 } disabled:opacity-50`}
               >
                 <span
@@ -301,8 +307,8 @@ export function SettingsPage({ onLogout }: SettingsPageProps) {
               <button
                 onClick={() => handleNotificationToggle("slackAlerts")}
                 disabled={isLoading}
-                className={`relative inline-flex h-8 w-14 items-center rounded-full transition-all border-2 ${
-                  notifications.slackAlerts ? "bg-primary border-primary" : "bg-disabled-bg border-border"
+                className={`relative inline-flex h-8 w-14 items-center rounded-full transition-all border-2 hover:scale-105 ${
+                  notifications.slackAlerts ? "bg-primary border-primary shadow-md shadow-primary/30" : "bg-disabled-bg border-border hover:border-primary/50"
                 } disabled:opacity-50`}
               >
                 <span
@@ -322,8 +328,8 @@ export function SettingsPage({ onLogout }: SettingsPageProps) {
               <button
                 onClick={() => handleNotificationToggle("pushNotifications")}
                 disabled={isLoading}
-                className={`relative inline-flex h-8 w-14 items-center rounded-full transition-all border-2 ${
-                  notifications.pushNotifications ? "bg-primary border-primary" : "bg-disabled-bg border-border"
+                className={`relative inline-flex h-8 w-14 items-center rounded-full transition-all border-2 hover:scale-105 ${
+                  notifications.pushNotifications ? "bg-primary border-primary shadow-md shadow-primary/30" : "bg-disabled-bg border-border hover:border-primary/50"
                 } disabled:opacity-50`}
               >
                 <span
@@ -343,8 +349,8 @@ export function SettingsPage({ onLogout }: SettingsPageProps) {
               <button
                 onClick={() => handleNotificationToggle("weeklyReport")}
                 disabled={isLoading}
-                className={`relative inline-flex h-8 w-14 items-center rounded-full transition-all border-2 ${
-                  notifications.weeklyReport ? "bg-primary border-primary" : "bg-disabled-bg border-border"
+                className={`relative inline-flex h-8 w-14 items-center rounded-full transition-all border-2 hover:scale-105 ${
+                  notifications.weeklyReport ? "bg-primary border-primary shadow-md shadow-primary/30" : "bg-disabled-bg border-border hover:border-primary/50"
                 } disabled:opacity-50`}
               >
                 <span
@@ -364,8 +370,8 @@ export function SettingsPage({ onLogout }: SettingsPageProps) {
               <button
                 onClick={() => handleNotificationToggle("anomalyNotifications")}
                 disabled={isLoading}
-                className={`relative inline-flex h-8 w-14 items-center rounded-full transition-all border-2 ${
-                  notifications.anomalyNotifications ? "bg-primary border-primary" : "bg-disabled-bg border-border"
+                className={`relative inline-flex h-8 w-14 items-center rounded-full transition-all border-2 hover:scale-105 ${
+                  notifications.anomalyNotifications ? "bg-primary border-primary shadow-md shadow-primary/30" : "bg-disabled-bg border-border hover:border-primary/50"
                 } disabled:opacity-50`}
               >
                 <span
@@ -385,8 +391,8 @@ export function SettingsPage({ onLogout }: SettingsPageProps) {
               <button
                 onClick={() => handleNotificationToggle("systemDowntime")}
                 disabled={isLoading}
-                className={`relative inline-flex h-8 w-14 items-center rounded-full transition-all border-2 ${
-                  notifications.systemDowntime ? "bg-primary border-primary" : "bg-disabled-bg border-border"
+                className={`relative inline-flex h-8 w-14 items-center rounded-full transition-all border-2 hover:scale-105 ${
+                  notifications.systemDowntime ? "bg-primary border-primary shadow-md shadow-primary/30" : "bg-disabled-bg border-border hover:border-primary/50"
                 } disabled:opacity-50`}
               >
                 <span

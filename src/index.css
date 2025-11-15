@@ -21,6 +21,26 @@
     --radius: 1rem;
   }
 
+  [data-theme="dark"],
+  .dark {
+    --background: #C0C0C0;
+    --card: #D3D3D3;
+    --hover: #B8B8B8;
+    --primary: #8B5CF6;
+    --secondary: #7C3AED;
+    --accent: #A78BFA;
+    --heading: #1A1A1A;
+    --foreground: #2D2D2D;
+    --link: #7C3AED;
+    --link-hover: #6D28D9;
+    --icon: #2D2D2D;
+    --icon-active: #8B5CF6;
+    --footer: #B8B8B8;
+    --disabled-text: #808080;
+    --disabled-bg: #A9A9A9;
+    --border: #A0A0A0;
+  }
+
   * {
     border-color: var(--border);
   }

@@ -260,7 +260,7 @@ export function ContainersPage({ isDarkMode }: ContainersPageProps) {
                 {containers.length > 6 && !showAllContainers && (
                   <button
                     onClick={() => setShowAllContainers(true)}
-                    className="flex items-center gap-2 text-primary hover:text-secondary font-semibold transition-all hover:translate-x-1"
+                    className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-[#A78BFA] to-[#8B5CF6] hover:from-[#C4B5FD] hover:to-[#A78BFA] text-white rounded-lg font-semibold transition-all shadow-md hover:shadow-lg hover:-translate-y-0.5"
                   >
                     View All <ChevronRight className="w-4 h-4" />
                   </button>
@@ -307,7 +307,7 @@ export function ContainersPage({ isDarkMode }: ContainersPageProps) {
                         <div className="space-y-3 text-sm mb-4">
                           <div className="flex items-center justify-between">
                             <span className="text-body">CPU</span>
-                            <span className="font-semibold text-heading">{container.cpu}%</span>
+                            <span className="font-semibold text-primary">{container.cpu}%</span>
                           </div>
                           <div className="w-full bg-disabled-bg rounded-full h-2 border border-border">
                             <div
@@ -318,7 +318,7 @@ export function ContainersPage({ isDarkMode }: ContainersPageProps) {
 
                           <div className="flex items-center justify-between pt-2">
                             <span className="text-body">Memory</span>
-                            <span className="font-semibold text-heading">{container.memory}%</span>
+                            <span className="font-semibold text-secondary">{container.memory}%</span>
                           </div>
                           <div className="w-full bg-disabled-bg rounded-full h-2 border border-border">
                             <div
@@ -329,7 +329,7 @@ export function ContainersPage({ isDarkMode }: ContainersPageProps) {
 
                           <div className="flex items-center justify-between pt-2">
                             <span className="text-body">Disk</span>
-                            <span className="font-semibold text-heading">{container.disk}%</span>
+                            <span className="font-semibold text-accent">{container.disk}%</span>
                           </div>
                           <div className="w-full bg-disabled-bg rounded-full h-2 border border-border">
                             <div
@@ -340,7 +340,7 @@ export function ContainersPage({ isDarkMode }: ContainersPageProps) {
 
                           <div className="flex items-center justify-between pt-2">
                             <span className="text-body">Network</span>
-                            <span className="font-semibold text-heading">{container.network} Mbps</span>
+                            <span className="font-semibold text-primary">{container.network} Mbps</span>
                           </div>
                         </div>
 
@@ -361,7 +361,7 @@ export function ContainersPage({ isDarkMode }: ContainersPageProps) {
               {showAllContainers && containers.length > 6 && (
                 <button
                   onClick={() => setShowAllContainers(false)}
-                  className="mt-4 px-4 py-2 bg-disabled-bg hover:bg-hover text-body border-2 border-border rounded-lg transition-all text-sm font-semibold hover:border-primary"
+                  className="mt-4 px-4 py-2 bg-gradient-to-r from-[#A78BFA] to-[#8B5CF6] hover:from-[#C4B5FD] hover:to-[#A78BFA] text-white border-2 border-primary rounded-lg transition-all text-sm font-semibold shadow-md hover:shadow-lg hover:-translate-y-0.5"
                 >
                   Collapse View
                 </button>
