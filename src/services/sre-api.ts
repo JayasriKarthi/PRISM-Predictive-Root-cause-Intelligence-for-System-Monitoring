@@ -1,3 +1,7 @@
+import axios from "axios"
+
+const API_BASE_URL = "http://localhost:8000"
+
 export interface SRE {
   id: string
   name: string
@@ -5,6 +9,23 @@ export interface SRE {
   assignedSystem: string
   status: "active" | "inactive"
   createdAt: string
+}
+
+// Backend API response format
+interface BackendSREResponse {
+  id: number
+  name: string
+  email: string
+  status: string
+  assigned_system: string | null
+}
+
+// Backend API request format
+interface BackendSRECreate {
+  name: string
+  email: string
+  status?: string
+  assigned_system?: string | null
 }
 
 export interface SystemManagement {
@@ -15,25 +36,27 @@ export interface SystemManagement {
   description: string
 }
 
-// Mock SRE database
-const mockSREs: SRE[] = [
-  {
-    id: "1",
-    name: "Alice Johnson",
-    email: "alice@example.com",
-    assignedSystem: "Payment System",
-    status: "active",
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: "2",
-    name: "Bob Smith",
-    email: "bob@example.com",
-    assignedSystem: "Auth Service",
-    status: "active",
-    createdAt: new Date().toISOString(),
-  },
-]
+// Helper function to convert backend format to frontend format
+const mapBackendToFrontend = (backendSRE: BackendSREResponse): SRE => {
+  return {
+    id: String(backendSRE.id),
+    name: backendSRE.name,
+    email: backendSRE.email,
+    assignedSystem: backendSRE.assigned_system || "Unassigned",
+    status: backendSRE.status === "active" ? "active" : "inactive",
+    createdAt: new Date().toISOString(), // Backend doesn't return createdAt, so we use current time
+  }
+}
+
+// Helper function to convert frontend format to backend format
+const mapFrontendToBackend = (frontendSRE: Omit<SRE, "id" | "createdAt">): BackendSRECreate => {
+  return {
+    name: frontendSRE.name,
+    email: frontendSRE.email,
+    status: frontendSRE.status || "active",
+    assigned_system: frontendSRE.assignedSystem === "Unassigned" ? null : frontendSRE.assignedSystem,
+  }
+}
 
 const mockSystems: SystemManagement[] = [
   {
@@ -62,84 +85,94 @@ const mockSystems: SystemManagement[] = [
 // SRE Management API
 export const sreAPI = {
   getAllSREs: async (): Promise<SRE[]> => {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        resolve([...mockSREs])
-      }, 300)
-    })
+    try {
+      const response = await axios.get<BackendSREResponse[]>(`${API_BASE_URL}/sre`)
+      return response.data.map(mapBackendToFrontend)
+    } catch (error) {
+      console.error("Error fetching SREs:", error)
+      if (axios.isAxiosError(error)) {
+        throw new Error(error.response?.data?.detail || "Failed to fetch SREs")
+      }
+      throw new Error("Failed to fetch SREs")
+    }
   },
 
   addSRE: async (sre: Omit<SRE, "id" | "createdAt">): Promise<{ success: boolean; data?: SRE; message: string }> => {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        if (!sre.name || !sre.email) {
-          resolve({ success: false, message: "Name and email are required" })
-          return
-        }
+    try {
+      if (!sre.name || !sre.email) {
+        return { success: false, message: "Name and email are required" }
+      }
 
-        if (!sre.email.includes("@")) {
-          resolve({ success: false, message: "Invalid email format" })
-          return
-        }
+      const backendData = mapFrontendToBackend(sre)
+      const response = await axios.post<BackendSREResponse>(`${API_BASE_URL}/sre`, backendData)
+      const frontendSRE = mapBackendToFrontend(response.data)
 
-        const newSRE: SRE = {
-          ...sre,
-          id: String(mockSREs.length + 1),
-          createdAt: new Date().toISOString(),
-        }
-
-        mockSREs.push(newSRE)
-        resolve({ success: true, data: newSRE, message: "SRE added successfully" })
-      }, 400)
-    })
+      return { success: true, data: frontendSRE, message: "SRE added successfully" }
+    } catch (error) {
+      console.error("Error adding SRE:", error)
+      if (axios.isAxiosError(error)) {
+        const errorMessage = error.response?.data?.detail || "Failed to add SRE"
+        return { success: false, message: errorMessage }
+      }
+      return { success: false, message: "Failed to add SRE" }
+    }
   },
 
   updateSRE: async (
     id: string,
     updates: Partial<Omit<SRE, "id" | "createdAt">>,
   ): Promise<{ success: boolean; data?: SRE; message: string }> => {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        const index = mockSREs.findIndex((s) => s.id === id)
-        if (index === -1) {
-          resolve({ success: false, message: "SRE not found" })
-          return
-        }
+    try {
+      const backendData: Partial<BackendSRECreate> = {}
+      if (updates.name) backendData.name = updates.name
+      if (updates.email) backendData.email = updates.email
+      if (updates.status) backendData.status = updates.status
+      if (updates.assignedSystem !== undefined) {
+        backendData.assigned_system = updates.assignedSystem === "Unassigned" ? null : updates.assignedSystem
+      }
 
-        mockSREs[index] = { ...mockSREs[index], ...updates }
-        resolve({ success: true, data: mockSREs[index], message: "SRE updated successfully" })
-      }, 400)
-    })
+      const response = await axios.put<BackendSREResponse>(`${API_BASE_URL}/sre/${id}`, backendData)
+      const frontendSRE = mapBackendToFrontend(response.data)
+
+      return { success: true, data: frontendSRE, message: "SRE updated successfully" }
+    } catch (error) {
+      console.error("Error updating SRE:", error)
+      if (axios.isAxiosError(error)) {
+        const errorMessage = error.response?.data?.detail || "Failed to update SRE"
+        return { success: false, message: errorMessage }
+      }
+      return { success: false, message: "Failed to update SRE" }
+    }
   },
 
   deleteSRE: async (id: string): Promise<{ success: boolean; message: string }> => {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        const index = mockSREs.findIndex((s) => s.id === id)
-        if (index === -1) {
-          resolve({ success: false, message: "SRE not found" })
-          return
-        }
-
-        mockSREs.splice(index, 1)
-        resolve({ success: true, message: "SRE deleted successfully" })
-      }, 400)
-    })
+    try {
+      await axios.delete(`${API_BASE_URL}/sre/${id}`)
+      return { success: true, message: "SRE deleted successfully" }
+    } catch (error) {
+      console.error("Error deleting SRE:", error)
+      if (axios.isAxiosError(error)) {
+        const errorMessage = error.response?.data?.detail || "Failed to delete SRE"
+        return { success: false, message: errorMessage }
+      }
+      return { success: false, message: "Failed to delete SRE" }
+    }
   },
 
   toggleSREStatus: async (id: string): Promise<{ success: boolean; data?: SRE; message: string }> => {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        const sre = mockSREs.find((s) => s.id === id)
-        if (!sre) {
-          resolve({ success: false, message: "SRE not found" })
-          return
-        }
+    try {
+      const response = await axios.patch<BackendSREResponse>(`${API_BASE_URL}/sre/${id}/status`)
+      const frontendSRE = mapBackendToFrontend(response.data)
 
-        sre.status = sre.status === "active" ? "inactive" : "active"
-        resolve({ success: true, data: sre, message: `SRE status changed to ${sre.status}` })
-      }, 400)
-    })
+      return { success: true, data: frontendSRE, message: `SRE status changed to ${frontendSRE.status}` }
+    } catch (error) {
+      console.error("Error toggling SRE status:", error)
+      if (axios.isAxiosError(error)) {
+        const errorMessage = error.response?.data?.detail || "Failed to toggle SRE status"
+        return { success: false, message: errorMessage }
+      }
+      return { success: false, message: "Failed to toggle SRE status" }
+    }
   },
 }
 

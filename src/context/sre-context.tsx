@@ -62,7 +62,8 @@ export function SREProvider({ children }: { children: ReactNode }) {
     try {
       const response = await sreAPI.addSRE(sre)
       if (response.success && response.data) {
-        setSREs((prev) => [...prev, response.data!])
+        // Reload all SREs from the server to ensure consistency
+        await loadSREs()
         return true
       } else {
         setError(response.message)
@@ -74,7 +75,7 @@ export function SREProvider({ children }: { children: ReactNode }) {
     } finally {
       setIsLoading(false)
     }
-  }, [])
+  }, [loadSREs])
 
   const updateSRE = useCallback(
     async (id: string, updates: Partial<Omit<SRE, "id" | "createdAt">>): Promise<boolean> => {
@@ -83,7 +84,8 @@ export function SREProvider({ children }: { children: ReactNode }) {
       try {
         const response = await sreAPI.updateSRE(id, updates)
         if (response.success && response.data) {
-          setSREs((prev) => prev.map((s) => (s.id === id ? response.data! : s)))
+          // Reload all SREs from the server to ensure consistency
+          await loadSREs()
           return true
         } else {
           setError(response.message)
@@ -96,7 +98,7 @@ export function SREProvider({ children }: { children: ReactNode }) {
         setIsLoading(false)
       }
     },
-    [],
+    [loadSREs],
   )
 
   const deleteSRE = useCallback(async (id: string): Promise<boolean> => {
@@ -105,7 +107,8 @@ export function SREProvider({ children }: { children: ReactNode }) {
     try {
       const response = await sreAPI.deleteSRE(id)
       if (response.success) {
-        setSREs((prev) => prev.filter((s) => s.id !== id))
+        // Reload all SREs from the server to ensure consistency
+        await loadSREs()
         return true
       } else {
         setError(response.message)
@@ -117,7 +120,7 @@ export function SREProvider({ children }: { children: ReactNode }) {
     } finally {
       setIsLoading(false)
     }
-  }, [])
+  }, [loadSREs])
 
   const toggleSREStatus = useCallback(async (id: string): Promise<boolean> => {
     setIsLoading(true)
@@ -125,7 +128,8 @@ export function SREProvider({ children }: { children: ReactNode }) {
     try {
       const response = await sreAPI.toggleSREStatus(id)
       if (response.success && response.data) {
-        setSREs((prev) => prev.map((s) => (s.id === id ? response.data! : s)))
+        // Reload all SREs from the server to ensure consistency
+        await loadSREs()
         return true
       } else {
         setError(response.message)
@@ -137,7 +141,7 @@ export function SREProvider({ children }: { children: ReactNode }) {
     } finally {
       setIsLoading(false)
     }
-  }, [])
+  }, [loadSREs])
 
   const addSystem = useCallback(async (system: Omit<SystemManagement, "id" | "lastUpdated">): Promise<boolean> => {
     setIsLoading(true)
