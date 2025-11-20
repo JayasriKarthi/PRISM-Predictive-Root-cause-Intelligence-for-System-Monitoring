@@ -6,15 +6,49 @@ import { useState } from "react"
 import { Zap, Server, Shield, Loader } from "lucide-react"
 import { useApi } from "../context/api-context"
 
+interface LoginResponse {
+  access_token: string
+  refresh_token: string
+  token_type: string
+}
+
 export function LoginPage() {
-  const { login, register, isLoading, error, clearError } = useApi()
+  const { error: contextError, clearError, syncUserFromStorage } = useApi()
   const [activeTab, setActiveTab] = useState<"login" | "register">("login")
-  const [activeRole, setActiveRole] = useState<"operator" | "admin" | null>(null)
+  const [activeRole, setActiveRole] = useState<"SRE" | "ADMIN" | null>(null)
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [username, setUsername] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
   const [localError, setLocalError] = useState("")
+  const [isLoading, setIsLoading] = useState(false)
+  const [isRegistering, setIsRegistering] = useState(false)
+
+  // Decode JWT token to extract user info
+  const decodeJWT = (
+    token: string,
+  ): { sub: string; email: string; role?: string; username?: string } | null => {
+    try {
+      const base64Url = token.split(".")[1]
+      const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/")
+      const jsonPayload = decodeURIComponent(
+        atob(base64)
+          .split("")
+          .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
+          .join("")
+      )
+      return JSON.parse(jsonPayload)
+    } catch (error) {
+      return null
+    }
+  }
+
+  const mapRoleToUiRole = (role?: string): "operator" | "admin" => {
+    if (role?.toUpperCase() === "ADMIN") {
+      return "admin"
+    }
+    return "operator"
+  }
 
   const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setEmail(e.target.value)
@@ -22,7 +56,7 @@ export function LoginPage() {
     clearError()
   }
 
-  const handleRoleSelect = (role: "operator" | "admin") => {
+  const handleRoleSelect = (role: "SRE" | "ADMIN") => {
     setActiveRole(role)
     setLocalError("")
     clearError()
@@ -31,20 +65,86 @@ export function LoginPage() {
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLocalError("")
+    setIsLoading(true)
 
     if (!email.trim() || !password.trim()) {
       setLocalError("Please enter both email and password")
+      setIsLoading(false)
       return
     }
 
     if (!email.includes("@")) {
       setLocalError("Please enter a valid email address")
+      setIsLoading(false)
       return
     }
 
-    const success = await login(email, password)
-    if (!success) {
-      // Error is set by the API context
+    try {
+      const response = await fetch("http://localhost:8000/api/v1/auth/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email: email.trim(),
+          password: password,
+        }),
+      })
+
+      if (!response.ok) {
+        // Try to parse error response
+        let errorMessage = "Invalid email or password"
+        try {
+          const errorData = await response.json()
+          if (errorData && typeof errorData === "object" && "detail" in errorData) {
+            errorMessage = typeof errorData.detail === "string" ? errorData.detail : "Login failed"
+          }
+        } catch (parseError) {
+          // If JSON parsing fails, use default message
+          errorMessage = `Login failed: ${response.status} ${response.statusText}`
+        }
+        setLocalError(errorMessage)
+        setIsLoading(false)
+        return
+      }
+
+      const data: LoginResponse = await response.json()
+
+      // Validate response has required fields
+      if (!data.access_token || !data.refresh_token) {
+        setLocalError("Invalid response from server")
+        setIsLoading(false)
+        return
+      }
+
+      // Save tokens to localStorage
+      localStorage.setItem("access_token", data.access_token)
+      localStorage.setItem("refresh_token", data.refresh_token)
+
+      // Decode token to get user info
+      const tokenPayload = decodeJWT(data.access_token)
+      if (tokenPayload) {
+        const userData = {
+          id: tokenPayload.sub,
+          email: tokenPayload.email,
+          username: tokenPayload.username ?? tokenPayload.email.split("@")[0],
+          role: mapRoleToUiRole(tokenPayload.role),
+          createdAt: new Date().toISOString(),
+        }
+        localStorage.setItem("user", JSON.stringify(userData))
+
+        // Sync user state in context to trigger re-render
+        syncUserFromStorage()
+      } else {
+        // If token decode fails, still sync from storage and reload
+        syncUserFromStorage()
+        window.location.reload()
+      }
+    } catch (error) {
+      console.error("Login error:", error)
+      setLocalError("Failed to connect to server. Please check if the backend is running.")
+    } finally {
+      setIsLoading(false)
     }
   }
 
@@ -77,14 +177,70 @@ export function LoginPage() {
       return
     }
 
-    const success = await register(email, password, username, activeRole)
-    if (success) {
-      // Successfully registered and logged in
+    setIsRegistering(true)
+    try {
+      const endpointRole = activeRole === "ADMIN" ? "admin" : "sre"
+      const response = await fetch(`http://localhost:8000/api/v1/auth/register/${endpointRole}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          username: username.trim(),
+          email: email.trim(),
+          password,
+        }),
+      })
+
+      if (!response.ok) {
+        let errorMessage = "Registration failed"
+        try {
+          const errorData = await response.json()
+          if (errorData && typeof errorData === "object" && "detail" in errorData) {
+            errorMessage = typeof errorData.detail === "string" ? errorData.detail : "Registration failed"
+          }
+        } catch {
+          errorMessage = `Registration failed: ${response.status} ${response.statusText}`
+        }
+        setLocalError(errorMessage)
+        return
+      }
+
+      const data: LoginResponse = await response.json()
+      if (!data.access_token || !data.refresh_token) {
+        setLocalError("Invalid response from server")
+        return
+      }
+
+      localStorage.setItem("access_token", data.access_token)
+      localStorage.setItem("refresh_token", data.refresh_token)
+
+      const tokenPayload = decodeJWT(data.access_token)
+      if (tokenPayload) {
+        const userData = {
+          id: tokenPayload.sub,
+          email: tokenPayload.email,
+          username: tokenPayload.username ?? username.trim(),
+          role: mapRoleToUiRole(tokenPayload.role),
+          createdAt: new Date().toISOString(),
+        }
+        localStorage.setItem("user", JSON.stringify(userData))
+        syncUserFromStorage()
+      } else {
+        syncUserFromStorage()
+        window.location.reload()
+      }
+
       setEmail("")
       setPassword("")
       setUsername("")
       setConfirmPassword("")
       setActiveRole(null)
+    } catch (error) {
+      console.error("Registration error:", error)
+      setLocalError("Failed to connect to server. Please check if the backend is running.")
+    } finally {
+      setIsRegistering(false)
     }
   }
 
@@ -157,8 +313,8 @@ export function LoginPage() {
               />
             </div>
 
-            {(localError || error) && (
-              <p className="text-red-500 text-sm bg-red-50 p-3 rounded-lg border border-red-200">{localError || error}</p>
+            {(localError || contextError) && (
+              <p className="text-red-500 text-sm bg-red-50 p-3 rounded-lg border border-red-200">{localError || contextError}</p>
             )}
 
             <button
@@ -181,9 +337,9 @@ export function LoginPage() {
               <div className="grid grid-cols-2 gap-3">
                 <button
                   type="button"
-                  onClick={() => handleRoleSelect("operator")}
+                  onClick={() => handleRoleSelect("SRE")}
                   className={`p-3 rounded-xl border-2 transition-all ${
-                    activeRole === "operator"
+                    activeRole === "SRE"
                       ? "border-primary bg-hover text-primary shadow-md"
                       : "border-border bg-card text-body hover:border-primary hover:text-primary hover:bg-hover hover:shadow-md hover:scale-105"
                   }`}
@@ -193,9 +349,9 @@ export function LoginPage() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => handleRoleSelect("admin")}
+                  onClick={() => handleRoleSelect("ADMIN")}
                   className={`p-3 rounded-xl border-2 transition-all ${
-                    activeRole === "admin"
+                    activeRole === "ADMIN"
                       ? "border-primary bg-hover text-primary shadow-md"
                       : "border-border bg-card text-body hover:border-primary hover:text-primary hover:bg-hover hover:shadow-md hover:scale-105"
                   }`}
@@ -214,7 +370,7 @@ export function LoginPage() {
                 onChange={(e) => setUsername(e.target.value)}
                 placeholder="your.username"
                 className="w-full px-4 py-2 bg-card border border-border rounded-lg text-foreground placeholder-body hover:border-primary/50 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
-                disabled={isLoading}
+                disabled={isRegistering}
               />
             </div>
 
@@ -226,7 +382,7 @@ export function LoginPage() {
                 onChange={handleEmailChange}
                 placeholder="you@example.com"
                 className="w-full px-4 py-2 bg-card border border-border rounded-lg text-foreground placeholder-body hover:border-primary/50 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
-                disabled={isLoading}
+                disabled={isRegistering}
               />
             </div>
 
@@ -238,7 +394,7 @@ export function LoginPage() {
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
                 className="w-full px-4 py-2 bg-card border border-border rounded-lg text-foreground placeholder-body hover:border-primary/50 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
-                disabled={isLoading}
+                disabled={isRegistering}
               />
             </div>
 
@@ -250,36 +406,24 @@ export function LoginPage() {
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 placeholder="••••••••"
                 className="w-full px-4 py-2 bg-card border border-border rounded-lg text-foreground placeholder-body hover:border-primary/50 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
-                disabled={isLoading}
+                disabled={isRegistering}
               />
             </div>
 
-            {(localError || error) && (
-              <p className="text-red-500 text-sm bg-red-50 p-3 rounded-lg border border-red-200">{localError || error}</p>
+            {(localError || contextError) && (
+              <p className="text-red-500 text-sm bg-red-50 p-3 rounded-lg border border-red-200">{localError || contextError}</p>
             )}
 
             <button
               type="submit"
-              disabled={isLoading || !activeRole}
+              disabled={isRegistering || !activeRole}
               className="w-full py-2 bg-gradient-to-r from-[#A78BFA] to-[#8B5CF6] hover:from-[#C4B5FD] hover:to-[#A78BFA] disabled:from-disabled-bg disabled:to-disabled-bg disabled:text-disabled-text text-white rounded-xl font-semibold transition-all flex items-center justify-center gap-2 shadow-md hover:shadow-xl hover:shadow-violet-500/30 hover:-translate-y-0.5 active:translate-y-0"
             >
-              {isLoading && <Loader className="w-4 h-4 animate-spin" />}
-              {isLoading ? "Creating Account..." : "Create Account"}
+              {isRegistering && <Loader className="w-4 h-4 animate-spin" />}
+              {isRegistering ? "Creating Account..." : "Create Account"}
             </button>
           </form>
         )}
-
-        {/* Demo Credentials */}
-        <div className="p-4 bg-hover rounded-xl border border-border">
-          <p className="text-xs font-semibold text-body uppercase mb-2">Demo Credentials:</p>
-          <p className="text-sm text-foreground mb-2">
-            SRE: <span className="text-primary">demo@example.com</span> /<span className="text-primary">demo123</span>
-          </p>
-          <p className="text-sm text-foreground">
-            Admin: <span className="text-primary">admin@example.com</span> /
-            <span className="text-primary">admin123</span>
-          </p>
-        </div>
       </div>
     </div>
   )

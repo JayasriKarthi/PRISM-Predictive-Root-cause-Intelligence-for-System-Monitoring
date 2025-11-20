@@ -3,7 +3,7 @@ from typing import Optional
 
 
 class SREBase(BaseModel):
-    name: str
+    name: str 
     email: EmailStr
     status: str = "active"
     assigned_system: Optional[str] = None

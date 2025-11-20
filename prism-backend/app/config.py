@@ -13,6 +13,12 @@ class Settings(BaseSettings):
     # API settings
     API_V1_PREFIX: str = "/api/v1"
     
+    # JWT settings
+    ACCESS_SECRET_KEY: str = "your-access-secret-key-change-in-production"
+    REFRESH_SECRET_KEY: str = "your-refresh-secret-key-change-in-production"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
+    REFRESH_TOKEN_EXPIRE_DAYS: int = 7
+    
     model_config = SettingsConfigDict(
         env_file=str(BACKEND_DIR / ".env"),
         case_sensitive=True,

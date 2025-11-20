@@ -16,18 +16,40 @@ interface ApiContextType {
   updateSettings: (updates: Partial<SettingsData>) => Promise<boolean>
   changePassword: (oldPassword: string, newPassword: string) => Promise<boolean>
   clearError: () => void
+  syncUserFromStorage: () => void
 }
 
 const ApiContext = createContext<ApiContextType | undefined>(undefined)
 
 export function ApiProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null)
-  const [token, setToken] = useState<string | null>(localStorage.getItem("auth_token"))
+  // Initialize user from localStorage if available
+  const getUserFromStorage = (): User | null => {
+    try {
+      const userStr = localStorage.getItem("user")
+      if (userStr) {
+        return JSON.parse(userStr)
+      }
+    } catch (error) {
+      console.error("Failed to parse user from localStorage:", error)
+    }
+    return null
+  }
+
+  const [user, setUser] = useState<User | null>(getUserFromStorage())
+  const [token, setToken] = useState<string | null>(localStorage.getItem("access_token") || localStorage.getItem("auth_token"))
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [settings, setSettings] = useState<SettingsData | null>(null)
 
   const clearError = useCallback(() => setError(null), [])
+
+  // Sync user from localStorage (useful after login)
+  const syncUserFromStorage = useCallback(() => {
+    const storedUser = getUserFromStorage()
+    const storedToken = localStorage.getItem("access_token") || localStorage.getItem("auth_token")
+    setUser(storedUser)
+    setToken(storedToken)
+  }, [])
 
   const login = useCallback(async (email: string, password: string): Promise<boolean> => {
     setIsLoading(true)
@@ -99,6 +121,8 @@ export function ApiProvider({ children }: { children: ReactNode }) {
     setToken(null)
     setSettings(null)
     localStorage.removeItem("auth_token")
+    localStorage.removeItem("access_token")
+    localStorage.removeItem("refresh_token")
     localStorage.removeItem("user")
   }, [])
 
@@ -182,6 +206,7 @@ export function ApiProvider({ children }: { children: ReactNode }) {
         updateSettings,
         changePassword,
         clearError,
+        syncUserFromStorage,
       }}
     >
       {children}
