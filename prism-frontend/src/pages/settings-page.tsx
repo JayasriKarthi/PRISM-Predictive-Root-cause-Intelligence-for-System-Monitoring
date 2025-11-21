@@ -3,7 +3,8 @@
 import type React from "react"
 
 import { useState, useEffect } from "react"
-import { Moon, Sun, LogOut, Lock, Mail, User, Bell, Loader, Check } from "lucide-react"
+import { useTheme } from "next-themes"
+import { Moon, Sun, LogOut, Lock, Mail, User, Bell, Loader, Check, Eye, EyeOff } from "lucide-react"
 import { useApi } from "../context/api-context"
 
 interface SettingsPageProps {
@@ -11,8 +12,8 @@ interface SettingsPageProps {
 }
 
 export function SettingsPage({ onLogout }: SettingsPageProps) {
-  const { settings, updateSettings, changePassword, logout, isLoading, error, clearError } = useApi()
-  const [theme, setTheme] = useState<"light" | "dark">("dark")
+  const { user, settings, updateSettings, changePassword, logout, isLoading, error, clearError } = useApi()
+  const { theme, setTheme } = useTheme()
   const [username, setUsername] = useState("")
   const [email, setEmail] = useState("")
   const [notifications, setNotifications] = useState({
@@ -30,16 +31,27 @@ export function SettingsPage({ onLogout }: SettingsPageProps) {
   const [passwordError, setPasswordError] = useState("")
   const [successMessage, setSuccessMessage] = useState("")
   const [isPasswordLoading, setIsPasswordLoading] = useState(false)
+  const [showOldPassword, setShowOldPassword] = useState(false)
+  const [showNewPassword, setShowNewPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
 
   // Load settings on mount
   useEffect(() => {
     if (settings) {
-      setTheme(settings.theme)
-      setUsername(settings.username)
-      setEmail(settings.email)
+      // Theme is handled by next-themes, but we can sync if needed. 
+      // For now, let's trust next-themes or sync it once.
+      // Actually, if user logs in on a new device, we might want to set theme from settings.
+      if (settings.theme && settings.theme !== theme) {
+        setTheme(settings.theme)
+      }
+      setUsername(settings.username || user?.username || "")
+      setEmail(settings.email || user?.email || "")
       setNotifications(settings.notifications)
+    } else if (user) {
+      setUsername(user.username || "")
+      setEmail(user.email || "")
     }
-  }, [settings])
+  }, [settings, user])
 
   const handleThemeChange = async (newTheme: "light" | "dark") => {
     clearError()
@@ -48,13 +60,6 @@ export function SettingsPage({ onLogout }: SettingsPageProps) {
     if (success) {
       setSuccessMessage("Theme updated successfully")
       setTimeout(() => setSuccessMessage(""), 3000)
-      if (newTheme === "dark") {
-        document.documentElement.setAttribute("data-theme", "dark")
-        document.documentElement.classList.add("dark")
-      } else {
-        document.documentElement.setAttribute("data-theme", "light")
-        document.documentElement.classList.remove("dark")
-      }
     }
   }
 
@@ -167,9 +172,9 @@ export function SettingsPage({ onLogout }: SettingsPageProps) {
               <input
                 type="text"
                 value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                disabled={isLoading}
-                className="w-full px-4 py-2 bg-card border-2 border-border rounded-lg text-foreground placeholder-body hover:border-primary/50 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all disabled:opacity-50"
+                readOnly
+                disabled
+                className="w-full px-4 py-2 bg-card border-2 border-border rounded-lg text-foreground placeholder-body opacity-60 cursor-not-allowed"
               />
             </div>
 
@@ -181,20 +186,11 @@ export function SettingsPage({ onLogout }: SettingsPageProps) {
               <input
                 type="email"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                disabled={isLoading}
-                className="w-full px-4 py-2 bg-card border-2 border-border rounded-lg text-foreground placeholder-body hover:border-primary/50 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all disabled:opacity-50"
+                readOnly
+                disabled
+                className="w-full px-4 py-2 bg-card border-2 border-border rounded-lg text-foreground placeholder-body opacity-60 cursor-not-allowed"
               />
             </div>
-
-            <button
-              onClick={handleUpdateProfile}
-              disabled={isLoading}
-              className="w-full px-4 py-2 bg-gradient-to-r from-[#A78BFA] to-[#8B5CF6] hover:from-[#C4B5FD] hover:to-[#A78BFA] disabled:from-disabled-bg disabled:to-disabled-bg text-white rounded-lg transition-all font-semibold flex items-center justify-center gap-2 shadow-md hover:shadow-lg hover:-translate-y-0.5 disabled:shadow-none disabled:translate-y-0"
-            >
-              {isLoading && <Loader className="w-4 h-4 animate-spin" />}
-              {isLoading ? "Updating..." : "Save Profile"}
-            </button>
 
             {/* Change Password Section */}
             {!showPasswordForm ? (
@@ -209,36 +205,63 @@ export function SettingsPage({ onLogout }: SettingsPageProps) {
               <form onSubmit={handleChangePassword} className="space-y-3 p-4 bg-hover border-2 border-border rounded-xl">
                 <div>
                   <label className="block text-xs font-medium text-heading mb-1">Current Password</label>
-                  <input
-                    type="password"
-                    value={oldPassword}
-                    onChange={(e) => setOldPassword(e.target.value)}
-                    disabled={isPasswordLoading}
-                    placeholder="••••••••"
-                    className="w-full px-3 py-2 bg-card border-2 border-border rounded-lg text-foreground placeholder-body hover:border-primary/50 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all disabled:opacity-50"
-                  />
+                  <div className="relative">
+                    <input
+                      type={showOldPassword ? "text" : "password"}
+                      value={oldPassword}
+                      onChange={(e) => setOldPassword(e.target.value)}
+                      disabled={isPasswordLoading}
+                      placeholder="••••••••"
+                      className="w-full px-3 py-2 bg-card border-2 border-border rounded-lg text-foreground placeholder-body hover:border-primary/50 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all disabled:opacity-50 pr-10"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowOldPassword(!showOldPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-body hover:text-primary transition-colors"
+                    >
+                      {showOldPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-heading mb-1">New Password</label>
-                  <input
-                    type="password"
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    disabled={isPasswordLoading}
-                    placeholder="••••••••"
-                    className="w-full px-3 py-2 bg-card border-2 border-border rounded-lg text-foreground placeholder-body hover:border-primary/50 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all disabled:opacity-50"
-                  />
+                  <div className="relative">
+                    <input
+                      type={showNewPassword ? "text" : "password"}
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      disabled={isPasswordLoading}
+                      placeholder="••••••••"
+                      className="w-full px-3 py-2 bg-card border-2 border-border rounded-lg text-foreground placeholder-body hover:border-primary/50 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all disabled:opacity-50 pr-10"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowNewPassword(!showNewPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-body hover:text-primary transition-colors"
+                    >
+                      {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-heading mb-1">Confirm Password</label>
-                  <input
-                    type="password"
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    disabled={isPasswordLoading}
-                    placeholder="••••••••"
-                    className="w-full px-3 py-2 bg-card border-2 border-border rounded-lg text-foreground placeholder-body hover:border-primary/50 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all disabled:opacity-50"
-                  />
+                  <div className="relative">
+                    <input
+                      type={showConfirmPassword ? "text" : "password"}
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      disabled={isPasswordLoading}
+                      placeholder="••••••••"
+                      className="w-full px-3 py-2 bg-card border-2 border-border rounded-lg text-foreground placeholder-body hover:border-primary/50 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all disabled:opacity-50 pr-10"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-body hover:text-primary transition-colors"
+                    >
+                      {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
                 </div>
                 {passwordError && <p className="text-red-600 text-sm bg-red-50 border-2 border-red-200 p-2 rounded-lg font-medium">{passwordError}</p>}
                 <div className="flex gap-2">
@@ -269,177 +292,8 @@ export function SettingsPage({ onLogout }: SettingsPageProps) {
           </div>
         </div>
 
-        {/* Notification Preferences */}
-        <div className="bg-card rounded-xl border-2 border-border p-6 mb-6 shadow-lg hover:border-primary transition-all duration-300">
-          <h2 className="text-xl font-semibold text-heading mb-6 flex items-center gap-2">
-            <Bell className="w-5 h-5 text-primary" />
-            Notification Preferences
-          </h2>
-
-          <div className="space-y-3">
-            {/* Email Alerts */}
-            <div className="flex items-center justify-between p-4 bg-hover border-2 border-border rounded-xl hover:border-primary transition-all">
-              <div>
-                <p className="font-medium text-heading">Email Alerts</p>
-                <p className="text-sm text-body">Receive critical alerts via email</p>
-              </div>
-              <button
-                onClick={() => handleNotificationToggle("emailAlerts")}
-                disabled={isLoading}
-                className={`relative inline-flex h-8 w-14 items-center rounded-full transition-all border-2 hover:scale-105 ${
-                  notifications.emailAlerts ? "bg-primary border-primary shadow-md shadow-primary/30" : "bg-disabled-bg border-border hover:border-primary/50"
-                } disabled:opacity-50`}
-              >
-                <span
-                  className={`inline-block h-6 w-6 transform rounded-full bg-white transition-transform shadow-md ${
-                    notifications.emailAlerts ? "translate-x-7" : "translate-x-1"
-                  }`}
-                />
-              </button>
-            </div>
-
-            {/* Slack Alerts */}
-            <div className="flex items-center justify-between p-4 bg-hover border-2 border-border rounded-xl hover:border-primary transition-all">
-              <div>
-                <p className="font-medium text-heading">Slack Alerts</p>
-                <p className="text-sm text-body">Send alerts to your Slack channel</p>
-              </div>
-              <button
-                onClick={() => handleNotificationToggle("slackAlerts")}
-                disabled={isLoading}
-                className={`relative inline-flex h-8 w-14 items-center rounded-full transition-all border-2 hover:scale-105 ${
-                  notifications.slackAlerts ? "bg-primary border-primary shadow-md shadow-primary/30" : "bg-disabled-bg border-border hover:border-primary/50"
-                } disabled:opacity-50`}
-              >
-                <span
-                  className={`inline-block h-6 w-6 transform rounded-full bg-white transition-transform shadow-md ${
-                    notifications.slackAlerts ? "translate-x-7" : "translate-x-1"
-                  }`}
-                />
-              </button>
-            </div>
-
-            {/* Push Notifications */}
-            <div className="flex items-center justify-between p-4 bg-hover border-2 border-border rounded-xl hover:border-primary transition-all">
-              <div>
-                <p className="font-medium text-heading">Push Notifications</p>
-                <p className="text-sm text-body">Get real-time browser notifications</p>
-              </div>
-              <button
-                onClick={() => handleNotificationToggle("pushNotifications")}
-                disabled={isLoading}
-                className={`relative inline-flex h-8 w-14 items-center rounded-full transition-all border-2 hover:scale-105 ${
-                  notifications.pushNotifications ? "bg-primary border-primary shadow-md shadow-primary/30" : "bg-disabled-bg border-border hover:border-primary/50"
-                } disabled:opacity-50`}
-              >
-                <span
-                  className={`inline-block h-6 w-6 transform rounded-full bg-white transition-transform shadow-md ${
-                    notifications.pushNotifications ? "translate-x-7" : "translate-x-1"
-                  }`}
-                />
-              </button>
-            </div>
-
-            {/* Weekly Report */}
-            <div className="flex items-center justify-between p-4 bg-hover border-2 border-border rounded-xl hover:border-primary transition-all">
-              <div>
-                <p className="font-medium text-heading">Weekly Report</p>
-                <p className="text-sm text-body">Receive weekly system summary</p>
-              </div>
-              <button
-                onClick={() => handleNotificationToggle("weeklyReport")}
-                disabled={isLoading}
-                className={`relative inline-flex h-8 w-14 items-center rounded-full transition-all border-2 hover:scale-105 ${
-                  notifications.weeklyReport ? "bg-primary border-primary shadow-md shadow-primary/30" : "bg-disabled-bg border-border hover:border-primary/50"
-                } disabled:opacity-50`}
-              >
-                <span
-                  className={`inline-block h-6 w-6 transform rounded-full bg-white transition-transform shadow-md ${
-                    notifications.weeklyReport ? "translate-x-7" : "translate-x-1"
-                  }`}
-                />
-              </button>
-            </div>
-
-            {/* Anomaly Notifications */}
-            <div className="flex items-center justify-between p-4 bg-hover border-2 border-border rounded-xl hover:border-primary transition-all">
-              <div>
-                <p className="font-medium text-heading">Anomaly Alerts</p>
-                <p className="text-sm text-body">Get notified on detected anomalies</p>
-              </div>
-              <button
-                onClick={() => handleNotificationToggle("anomalyNotifications")}
-                disabled={isLoading}
-                className={`relative inline-flex h-8 w-14 items-center rounded-full transition-all border-2 hover:scale-105 ${
-                  notifications.anomalyNotifications ? "bg-primary border-primary shadow-md shadow-primary/30" : "bg-disabled-bg border-border hover:border-primary/50"
-                } disabled:opacity-50`}
-              >
-                <span
-                  className={`inline-block h-6 w-6 transform rounded-full bg-white transition-transform shadow-md ${
-                    notifications.anomalyNotifications ? "translate-x-7" : "translate-x-1"
-                  }`}
-                />
-              </button>
-            </div>
-
-            {/* System Downtime */}
-            <div className="flex items-center justify-between p-4 bg-hover border-2 border-border rounded-xl hover:border-primary transition-all">
-              <div>
-                <p className="font-medium text-heading">System Downtime Alerts</p>
-                <p className="text-sm text-body">Critical alerts for service outages</p>
-              </div>
-              <button
-                onClick={() => handleNotificationToggle("systemDowntime")}
-                disabled={isLoading}
-                className={`relative inline-flex h-8 w-14 items-center rounded-full transition-all border-2 hover:scale-105 ${
-                  notifications.systemDowntime ? "bg-primary border-primary shadow-md shadow-primary/30" : "bg-disabled-bg border-border hover:border-primary/50"
-                } disabled:opacity-50`}
-              >
-                <span
-                  className={`inline-block h-6 w-6 transform rounded-full bg-white transition-transform shadow-md ${
-                    notifications.systemDowntime ? "translate-x-7" : "translate-x-1"
-                  }`}
-                />
-              </button>
-            </div>
-          </div>
-        </div>
-
         {/* Theme Section */}
-        <div className="bg-card rounded-xl border-2 border-border p-6 mb-6 shadow-lg hover:border-primary transition-all duration-300">
-          <h2 className="text-xl font-semibold text-heading mb-6 flex items-center gap-2">
-            {theme === "dark" ? <Moon className="w-5 h-5 text-primary" /> : <Sun className="w-5 h-5 text-primary" />}
-            Theme
-          </h2>
-
-          <div className="grid grid-cols-2 gap-4">
-            <button
-              onClick={() => handleThemeChange("light")}
-              disabled={isLoading}
-              className={`p-4 rounded-xl border-2 transition-all disabled:opacity-50 ${
-                theme === "light"
-                  ? "border-amber-400 bg-amber-50 shadow-md"
-                  : "border-border bg-hover hover:border-amber-300"
-              }`}
-            >
-              <Sun className={`w-6 h-6 mx-auto mb-2 ${theme === "light" ? "text-amber-600" : "text-body"}`} />
-              <p className={`font-semibold text-sm ${theme === "light" ? "text-amber-700" : "text-body"}`}>Light Theme</p>
-            </button>
-            <button
-              onClick={() => handleThemeChange("dark")}
-              disabled={isLoading}
-              className={`p-4 rounded-xl border-2 transition-all disabled:opacity-50 ${
-                theme === "dark"
-                  ? "border-primary bg-hover shadow-md"
-                  : "border-border bg-hover hover:border-primary"
-              }`}
-            >
-              <Moon className={`w-6 h-6 mx-auto mb-2 ${theme === "dark" ? "text-primary" : "text-body"}`} />
-              <p className={`font-semibold text-sm ${theme === "dark" ? "text-primary" : "text-body"}`}>Dark Theme</p>
-            </button>
-          </div>
-        </div>
-
+       
         {/* Logout Section */}
         <div className="bg-red-50 rounded-xl border-2 border-red-200 p-6 shadow-lg">
           <h2 className="text-xl font-semibold text-red-600 mb-4 flex items-center gap-2">

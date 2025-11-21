@@ -57,6 +57,7 @@
     "react-feather": "latest",
     "react-hook-form": "latest",
     "react-resizable-panels": "latest",
+    "react-router-dom": "^7.9.6",
     "recharts": "latest",
     "sass": "latest",
     "sass-embedded": "latest",

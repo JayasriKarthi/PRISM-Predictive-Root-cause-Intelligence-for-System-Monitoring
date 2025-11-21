@@ -4,6 +4,7 @@ const plugin = require('tailwindcss/plugin')
 
 module.exports = {
   ...defaultConfig,
+  darkMode: "class",
   content: [...defaultConfig.content, "./index.html", "./src/**/*.{js,ts,jsx,tsx}", "*.{js,ts,jsx,tsx,mdx}"],
   theme: {
     ...defaultConfig.theme,
@@ -36,7 +37,7 @@ module.exports = {
       },
     },
   },
-  plugins: [...defaultConfig.plugins, require("tailwindcss-animate"), plugin(function({ addUtilities }) {
+  plugins: [...defaultConfig.plugins, require("tailwindcss-animate"), plugin(function ({ addUtilities }) {
     addUtilities({
       '.border-border': { 'border-color': 'hsl(var(--border))' },
       '.outline-ring': { 'outline-color': 'hsl(var(--ring))' }

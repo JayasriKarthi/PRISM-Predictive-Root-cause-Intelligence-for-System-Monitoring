@@ -25,6 +25,22 @@ export function ApiProvider({ children }: { children: ReactNode }) {
   // Initialize user from localStorage if available
   const getUserFromStorage = (): User | null => {
     try {
+      const token = localStorage.getItem("access_token") || localStorage.getItem("auth_token")
+      console.log("Checking token from storage:", token ? "Found" : "Not Found")
+
+      if (!token) return null
+
+      const isValid = authAPI.validateToken(token)
+      console.log("Token validation result:", isValid)
+
+      if (!isValid) {
+        console.log("Token invalid, clearing storage")
+        // Clear invalid session
+        localStorage.removeItem("user")
+        localStorage.removeItem("access_token")
+        localStorage.removeItem("auth_token")
+        return null
+      }
       const userStr = localStorage.getItem("user")
       if (userStr) {
         return JSON.parse(userStr)
@@ -43,13 +59,47 @@ export function ApiProvider({ children }: { children: ReactNode }) {
 
   const clearError = useCallback(() => setError(null), [])
 
+  const logout = useCallback(() => {
+    setUser(null)
+    setToken(null)
+    setSettings(null)
+    localStorage.removeItem("auth_token")
+    localStorage.removeItem("access_token")
+    localStorage.removeItem("refresh_token")
+    localStorage.removeItem("user")
+  }, [])
+
   // Sync user from localStorage (useful after login)
-  const syncUserFromStorage = useCallback(() => {
+  const syncUserFromStorage = useCallback(async () => {
     const storedUser = getUserFromStorage()
     const storedToken = localStorage.getItem("access_token") || localStorage.getItem("auth_token")
-    setUser(storedUser)
-    setToken(storedToken)
-  }, [])
+
+    if (storedToken && storedUser) {
+      // Verify with backend
+      const response = await authAPI.getMe(storedToken)
+      if (!response.success) {
+        console.log("Backend rejected token, logging out")
+        logout()
+        return
+      }
+      // Update user with fresh data from backend
+      if (response.user) {
+        setUser(response.user)
+        localStorage.setItem("user", JSON.stringify(response.user))
+      } else {
+        setUser(storedUser)
+      }
+      setToken(storedToken)
+    } else {
+      setUser(null)
+      setToken(null)
+    }
+  }, [logout])
+
+  // Check session on mount
+  useState(() => {
+    syncUserFromStorage()
+  })
 
   const login = useCallback(async (email: string, password: string): Promise<boolean> => {
     setIsLoading(true)
@@ -116,15 +166,7 @@ export function ApiProvider({ children }: { children: ReactNode }) {
     [],
   )
 
-  const logout = useCallback(() => {
-    setUser(null)
-    setToken(null)
-    setSettings(null)
-    localStorage.removeItem("auth_token")
-    localStorage.removeItem("access_token")
-    localStorage.removeItem("refresh_token")
-    localStorage.removeItem("user")
-  }, [])
+
 
   const loadSettings = useCallback(async (userId: string) => {
     try {
@@ -172,13 +214,17 @@ export function ApiProvider({ children }: { children: ReactNode }) {
       setError(null)
 
       try {
-        const response = await settingsAPI.changePassword(user.id, oldPassword, newPassword)
+        const response = await settingsAPI.changePassword(user.id, oldPassword, newPassword, token || undefined)
 
         if (response.success) {
           setError(null)
           return true
         } else {
-          setError(response.message)
+          if (response.message.toLowerCase().includes("expired") || response.message.toLowerCase().includes("invalid token")) {
+            setError("Session expired. Please logout and login again.")
+          } else {
+            setError(response.message)
+          }
           return false
         }
       } catch (err) {
@@ -188,7 +234,7 @@ export function ApiProvider({ children }: { children: ReactNode }) {
         setIsLoading(false)
       }
     },
-    [user],
+    [user, token],
   )
 
   return (

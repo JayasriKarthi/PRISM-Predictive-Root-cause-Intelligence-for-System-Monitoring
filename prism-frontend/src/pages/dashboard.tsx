@@ -1,6 +1,7 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
+import { useTheme } from "next-themes"
 import { SidebarNavigation } from "../components/sidebar-navigation"
 import { HomePage } from "./home-page"
 import { AdminHomePage } from "./admin-home-page"
@@ -21,8 +22,9 @@ interface DashboardProps {
 
 export function Dashboard({ userRole, onLogout }: DashboardProps) {
   const [currentPage, setCurrentPage] = useState("home")
-  const [isDarkMode, setIsDarkMode] = useState(true)
+  const { theme, setTheme } = useTheme()
   const [previousPage, setPreviousPage] = useState("home")
+  const isDarkMode = theme === "dark"
 
   const handlePageChange = (page: string) => {
     if (currentPage !== "containers") {
@@ -36,27 +38,8 @@ export function Dashboard({ userRole, onLogout }: DashboardProps) {
   }
 
   const handleThemeToggle = () => {
-    const newTheme = !isDarkMode
-    setIsDarkMode(newTheme)
-    if (newTheme) {
-      document.documentElement.setAttribute("data-theme", "dark")
-      document.documentElement.classList.add("dark")
-    } else {
-      document.documentElement.setAttribute("data-theme", "light")
-      document.documentElement.classList.remove("dark")
-    }
+    setTheme(isDarkMode ? "light" : "dark")
   }
-
-  // Apply theme on mount
-  useEffect(() => {
-    if (isDarkMode) {
-      document.documentElement.setAttribute("data-theme", "dark")
-      document.documentElement.classList.add("dark")
-    } else {
-      document.documentElement.setAttribute("data-theme", "light")
-      document.documentElement.classList.remove("dark")
-    }
-  }, [isDarkMode])
 
   const renderPage = () => {
     switch (currentPage) {

@@ -1,7 +1,7 @@
 """
 Authentication routes for login and token refresh.
 """
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Header
 from typing import Literal
 
 from pydantic import BaseModel, EmailStr, Field
@@ -248,4 +248,67 @@ async def register_admin(
 ):
     """Register a new Admin account."""
     return await _register_user(register_data, "ADMIN", prisma)
+
+
+class ChangePasswordRequest(BaseModel):
+    old_password: str
+    new_password: str = Field(min_length=6)
+
+
+async def get_current_user(
+    authorization: str | None = Header(default=None),
+    prisma: Prisma = Depends(get_prisma)
+):
+    if not authorization:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing authorization header")
+    
+    try:
+        scheme, token = authorization.split()
+        if scheme.lower() != "bearer":
+             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid authentication scheme")
+             
+        payload = decode_token(token)
+        user_id = payload.get("sub")
+        if not user_id:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token payload")
+            
+        user = await prisma.user.find_unique(where={"id": int(user_id)})
+        if not user:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
+            
+        return user
+    except Exception as e:
+        print(f"Token verification error: {str(e)}")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=f"Invalid token: {str(e)}")
+
+
+@router.put("/password", status_code=status.HTTP_200_OK)
+async def change_password(
+    password_data: ChangePasswordRequest,
+    user = Depends(get_current_user),
+    prisma: Prisma = Depends(get_prisma)
+):
+    """Change user password."""
+    if not verify_password(password_data.old_password, user.password):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Incorrect old password")
+        
+    hashed_password = get_password_hash(password_data.new_password)
+    
+    await prisma.user.update(
+        where={"id": user.id},
+        data={"password": hashed_password}
+    )
+    
+    return {"message": "Password updated successfully"}
+
+
+@router.get("/me", status_code=status.HTTP_200_OK)
+async def get_me(user = Depends(get_current_user)):
+    """Get current user details."""
+    return {
+        "id": user.id,
+        "email": user.email,
+        "username": user.username,
+        "role": user.role
+    }
 

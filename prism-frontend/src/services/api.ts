@@ -29,8 +29,32 @@ export interface SettingsData {
   }
 }
 
-// Simulated database storage (in production, this would be a real backend)
-const mockUsers: Record<string, User & { password: string }> = {
+// Helper to manage mock database in localStorage
+const STORAGE_KEYS = {
+  USERS: "prism_mock_users",
+  SETTINGS: "prism_mock_settings",
+}
+
+const loadFromStorage = <T>(key: string, defaultValue: T): T => {
+  try {
+    const stored = localStorage.getItem(key)
+    return stored ? JSON.parse(stored) : defaultValue
+  } catch (e) {
+    console.error(`Failed to load ${key} from storage`, e)
+    return defaultValue
+  }
+}
+
+const saveToStorage = (key: string, value: any) => {
+  try {
+    localStorage.setItem(key, JSON.stringify(value))
+  } catch (e) {
+    console.error(`Failed to save ${key} to storage`, e)
+  }
+}
+
+// Default mock data
+const defaultUsers: Record<string, User & { password: string }> = {
   "demo@example.com": {
     id: "1",
     email: "demo@example.com",
@@ -49,7 +73,7 @@ const mockUsers: Record<string, User & { password: string }> = {
   },
 }
 
-const mockUserSettings: Record<string, SettingsData> = {
+const defaultSettings: Record<string, SettingsData> = {
   "1": {
     username: "demo.user",
     email: "demo@example.com",
@@ -78,56 +102,69 @@ const mockUserSettings: Record<string, SettingsData> = {
   },
 }
 
+// Initialize state from storage or defaults
+const mockUsers = loadFromStorage(STORAGE_KEYS.USERS, defaultUsers)
+const mockUserSettings = loadFromStorage(STORAGE_KEYS.SETTINGS, defaultSettings)
+
+// Email validation and authentication
+// Helper to decode JWT
+const parseJwt = (token: string): any => {
+  try {
+    const base64Url = token.split('.')[1];
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const jsonPayload = decodeURIComponent(window.atob(base64).split('').map(function (c) {
+      return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+    }).join(''));
+    return JSON.parse(jsonPayload);
+  } catch (e) {
+    return null;
+  }
+};
+
 // Email validation and authentication
 export const authAPI = {
   login: async (email: string, password: string): Promise<AuthResponse> => {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        // Validate email format
-        if (!email.includes("@")) {
-          resolve({
-            success: false,
-            message: "Invalid email format",
-          })
-          return
+    try {
+      const response = await fetch("http://localhost:8000/api/v1/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        return {
+          success: false,
+          message: data.detail || "Login failed",
         }
+      }
 
-        // Find user by email
-        const user = mockUsers[email]
-        if (!user) {
-          resolve({
-            success: false,
-            message: "User not found. Please check your email.",
-          })
-          return
-        }
+      const { access_token } = data
+      const decoded = parseJwt(access_token)
 
-        // Validate password
-        if (user.password !== password) {
-          resolve({
-            success: false,
-            message: "Incorrect password. Please try again.",
-          })
-          return
-        }
+      if (!decoded) {
+        return { success: false, message: "Invalid token received" }
+      }
 
-        // Generate mock token
-        const token = btoa(`${email}:${Date.now()}`)
+      const user: User = {
+        id: decoded.sub,
+        email: decoded.email,
+        username: decoded.username,
+        role: decoded.role.toLowerCase(),
+        createdAt: new Date().toISOString(), // Backend doesn't send this in token, using current time or we could fetch profile
+      }
 
-        resolve({
-          success: true,
-          message: "Login successful",
-          user: {
-            id: user.id,
-            email: user.email,
-            username: user.username,
-            role: user.role,
-            createdAt: user.createdAt,
-          },
-          token,
-        })
-      }, 500) // Simulate network delay
-    })
+      return {
+        success: true,
+        message: "Login successful",
+        user,
+        token: access_token,
+      }
+    } catch (error) {
+      console.error("Login error:", error)
+      return { success: false, message: "Failed to connect to server" }
+    }
   },
 
   register: async (
@@ -136,79 +173,93 @@ export const authAPI = {
     username: string,
     role: "operator" | "admin" = "operator",
   ): Promise<AuthResponse> => {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        if (!email.includes("@")) {
-          resolve({
-            success: false,
-            message: "Invalid email format",
-          })
-          return
-        }
+    try {
+      // Determine endpoint based on role
+      const endpoint = role === "admin" ? "register/admin" : "register/sre" // Assuming 'operator' maps to SRE or similar. 
+      // Wait, backend has /register/sre and /register/admin. 
+      // Let's assume 'operator' -> 'sre' for now based on previous context, or check routes.py.
+      // routes.py has /register/sre and /register/admin.
 
-        if (mockUsers[email]) {
-          resolve({
-            success: false,
-            message: "Email already registered",
-          })
-          return
-        }
+      const url = `http://localhost:8000/api/v1/auth/${role === "admin" ? "register/admin" : "register/sre"}`
 
-        if (password.length < 6) {
-          resolve({
-            success: false,
-            message: "Password must be at least 6 characters",
-          })
-          return
-        }
+      const response = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password, username }),
+      })
 
-        const newUser: User & { password: string } = {
-          id: String(Object.keys(mockUsers).length + 1),
-          email,
-          password,
-          username,
-          role,
-          createdAt: new Date().toISOString(),
-        }
+      const data = await response.json()
 
-        mockUsers[email] = newUser
-        mockUserSettings[newUser.id] = {
-          username,
-          email,
-          theme: "dark",
-          notifications: {
-            emailAlerts: true,
-            slackAlerts: true,
-            pushNotifications: false,
-            weeklyReport: true,
-            anomalyNotifications: true,
-            systemDowntime: true,
-          },
+      if (!response.ok) {
+        return {
+          success: false,
+          message: data.detail || "Registration failed",
         }
+      }
 
-        resolve({
-          success: true,
-          message: "Registration successful",
-          user: {
-            id: newUser.id,
-            email: newUser.email,
-            username: newUser.username,
-            role: newUser.role,
-            createdAt: newUser.createdAt,
-          },
-          token: btoa(`${email}:${Date.now()}`),
-        })
-      }, 500)
-    })
+      const { access_token } = data
+      const decoded = parseJwt(access_token)
+
+      const user: User = {
+        id: decoded.sub,
+        email: decoded.email,
+        username: decoded.username,
+        role: decoded.role.toLowerCase(),
+        createdAt: new Date().toISOString(),
+      }
+
+      return {
+        success: true,
+        message: "Registration successful",
+        user,
+        token: access_token,
+      }
+    } catch (error) {
+      console.error("Registration error:", error)
+      return { success: false, message: "Failed to connect to server" }
+    }
+  },
+
+  validateToken: (token: string): boolean => {
+    const decoded = parseJwt(token)
+    if (!decoded) return false
+    // Check expiration if present
+    if (decoded.exp && Date.now() >= decoded.exp * 1000) return false
+    return true
+  },
+
+  getMe: async (token: string): Promise<AuthResponse> => {
+    try {
+      const response = await fetch("http://localhost:8000/api/v1/auth/me", {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      })
+
+      if (!response.ok) {
+        return { success: false, message: "Session invalid" }
+      }
+
+      const data = await response.json()
+      const user: User = {
+        id: String(data.id),
+        email: data.email,
+        username: data.username,
+        role: data.role.toLowerCase(),
+        createdAt: new Date().toISOString(),
+      }
+
+      return { success: true, message: "Valid session", user }
+    } catch (error) {
+      return { success: false, message: "Failed to verify session" }
+    }
   },
 
   verifyEmail: async (token: string): Promise<boolean> => {
-    // Simulated email verification
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        resolve(!!token)
-      }, 300)
-    })
+    // Placeholder as backend might not have this yet
+    return true
   },
 }
 
@@ -228,18 +279,30 @@ export const settingsAPI = {
   ): Promise<{ success: boolean; data?: SettingsData; message: string }> => {
     return new Promise((resolve) => {
       setTimeout(() => {
+        // If settings don't exist for this user (e.g. new real user), create them
         if (!mockUserSettings[userId]) {
-          resolve({
-            success: false,
-            message: "User settings not found",
-          })
-          return
+          mockUserSettings[userId] = {
+            username: "User",
+            email: "user@example.com",
+            theme: "light",
+            notifications: {
+              emailAlerts: true,
+              slackAlerts: false,
+              pushNotifications: false,
+              weeklyReport: true,
+              anomalyNotifications: true,
+              systemDowntime: true,
+            },
+            ...settings // Apply the updates immediately
+          }
+        } else {
+          mockUserSettings[userId] = {
+            ...mockUserSettings[userId],
+            ...settings,
+          }
         }
 
-        mockUserSettings[userId] = {
-          ...mockUserSettings[userId],
-          ...settings,
-        }
+        saveToStorage(STORAGE_KEYS.SETTINGS, mockUserSettings)
 
         resolve({
           success: true,
@@ -254,41 +317,38 @@ export const settingsAPI = {
     userId: string,
     oldPassword: string,
     newPassword: string,
+    token?: string,
   ): Promise<{ success: boolean; message: string }> => {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        const userEmail = Object.keys(mockUsers).find((email) => mockUsers[email].id === userId)
-        if (!userEmail) {
-          resolve({
-            success: false,
-            message: "User not found",
-          })
-          return
-        }
+    try {
+      const authToken = token || localStorage.getItem("access_token")
+      if (!authToken) {
+        return { success: false, message: "Not authenticated" }
+      }
 
-        const user = mockUsers[userEmail]
-        if (user.password !== oldPassword) {
-          resolve({
-            success: false,
-            message: "Current password is incorrect",
-          })
-          return
-        }
+      const response = await fetch("http://localhost:8000/api/v1/auth/password", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${authToken}`,
+        },
+        body: JSON.stringify({
+          old_password: oldPassword,
+          new_password: newPassword,
+        }),
+      })
 
-        if (newPassword.length < 6) {
-          resolve({
-            success: false,
-            message: "New password must be at least 6 characters",
-          })
-          return
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        return {
+          success: false,
+          message: errorData.detail || "Failed to change password",
         }
+      }
 
-        user.password = newPassword
-        resolve({
-          success: true,
-          message: "Password changed successfully",
-        })
-      }, 400)
-    })
+      return { success: true, message: "Password changed successfully" }
+    } catch (error) {
+      console.error("Change password error:", error)
+      return { success: false, message: "Failed to connect to server" }
+    }
   },
 }

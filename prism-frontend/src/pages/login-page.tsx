@@ -3,7 +3,7 @@
 import type React from "react"
 
 import { useState } from "react"
-import { Zap, Server, Shield, Loader } from "lucide-react"
+import { Zap, Server, Shield, Loader, Eye, EyeOff } from "lucide-react"
 import { useApi } from "../context/api-context"
 
 interface LoginResponse {
@@ -23,6 +23,7 @@ export function LoginPage() {
   const [localError, setLocalError] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [isRegistering, setIsRegistering] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
 
   // Decode JWT token to extract user info
   const decodeJWT = (
@@ -264,9 +265,8 @@ export function LoginPage() {
               setLocalError("")
               clearError()
             }}
-            className={`flex-1 py-3 font-semibold transition-colors ${
-              activeTab === "login" ? "text-primary border-b-2 border-primary" : "text-body hover:text-primary"
-            }`}
+            className={`flex-1 py-3 font-semibold transition-colors ${activeTab === "login" ? "text-primary border-b-2 border-primary" : "text-body hover:text-primary"
+              }`}
           >
             Sign In
           </button>
@@ -276,11 +276,10 @@ export function LoginPage() {
               setLocalError("")
               clearError()
             }}
-            className={`flex-1 py-3 font-semibold transition-colors ${
-              activeTab === "register"
+            className={`flex-1 py-3 font-semibold transition-colors ${activeTab === "register"
                 ? "text-primary border-b-2 border-primary"
                 : "text-body hover:text-primary"
-            }`}
+              }`}
           >
             Create Account
           </button>
@@ -303,14 +302,23 @@ export function LoginPage() {
 
             <div>
               <label className="block text-sm font-medium text-heading mb-2">Password</label>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                className="w-full px-4 py-2 bg-card border border-border rounded-lg text-foreground placeholder-body hover:border-primary/50 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
-                disabled={isLoading}
-              />
+              <div className="relative">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  className="w-full px-4 py-2 bg-card border border-border rounded-lg text-foreground placeholder-body hover:border-primary/50 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all pr-10"
+                  disabled={isLoading}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-body hover:text-primary transition-colors"
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
             </div>
 
             {(localError || contextError) && (
@@ -338,11 +346,10 @@ export function LoginPage() {
                 <button
                   type="button"
                   onClick={() => handleRoleSelect("SRE")}
-                  className={`p-3 rounded-xl border-2 transition-all ${
-                    activeRole === "SRE"
+                  className={`p-3 rounded-xl border-2 transition-all ${activeRole === "SRE"
                       ? "border-primary bg-hover text-primary shadow-md"
                       : "border-border bg-card text-body hover:border-primary hover:text-primary hover:bg-hover hover:shadow-md hover:scale-105"
-                  }`}
+                    }`}
                 >
                   <Server className="w-5 h-5 mx-auto mb-1" />
                   <p className="text-xs font-semibold">SRE</p>
@@ -350,11 +357,10 @@ export function LoginPage() {
                 <button
                   type="button"
                   onClick={() => handleRoleSelect("ADMIN")}
-                  className={`p-3 rounded-xl border-2 transition-all ${
-                    activeRole === "ADMIN"
+                  className={`p-3 rounded-xl border-2 transition-all ${activeRole === "ADMIN"
                       ? "border-primary bg-hover text-primary shadow-md"
                       : "border-border bg-card text-body hover:border-primary hover:text-primary hover:bg-hover hover:shadow-md hover:scale-105"
-                  }`}
+                    }`}
                 >
                   <Shield className="w-5 h-5 mx-auto mb-1" />
                   <p className="text-xs font-semibold">Admin</p>
